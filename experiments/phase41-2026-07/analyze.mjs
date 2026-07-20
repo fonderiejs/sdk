@@ -66,7 +66,11 @@ if (existsSync(resultsDir)) {
       cacheRead: u.cache_read_input_tokens ?? 0, cacheWrite: u.cache_creation_input_tokens ?? 0,
       input: u.input_tokens ?? 0, output: u.output_tokens ?? 0,
       loc: meta.loc ?? null, tsc: meta.tsc ?? null,
-      kTokens: meta.k_tokens ?? null, quality: meta.checklist ?? meta.quality ?? null,
+      kTokens: meta.k_tokens ?? null,
+      qPass: meta.checklist_pass ?? null, qTotal: meta.checklist_total ?? null,
+      // scored iff both present; belowFloor iff pass < total-1 (the ≥11/12 spirit)
+      quality: meta.checklist_pass != null && meta.checklist_total != null ? `${meta.checklist_pass}/${meta.checklist_total}` : null,
+      belowFloor: meta.checklist_pass != null && meta.checklist_total != null && meta.checklist_pass < meta.checklist_total - 1,
       limited: r.subtype === 'error_max_turns' || /limit/i.test(r.subtype || ''),
     });
   }
@@ -81,7 +85,7 @@ const padL = (s, n) => String(s ?? '').padStart(n);
 console.log('\n=== Raw sessions (audit trail) ===');
 console.log([pad('id', 14), padL('turns', 6), padL('cost$', 8), padL('cacheRead', 11), padL('K_tok', 8), padL('loc', 5), pad(' tsc', 5), pad('qual', 5)].join(' '));
 for (const s of sessions) {
-  console.log([pad(s.id, 14), padL(s.turns, 6), padL(s.cost?.toFixed(3), 8), padL(s.cacheRead, 11), padL(s.kTokens ?? '—', 8), padL(s.loc, 5), pad(' ' + (s.tsc ?? '—'), 5), pad(s.quality ?? '—', 5)].join(' ') + (s.limited ? '  ⚠limited' : ''));
+  console.log([pad(s.id, 14), padL(s.turns, 6), padL(s.cost?.toFixed(3), 8), padL(s.cacheRead, 11), padL(s.kTokens ?? '—', 8), padL(s.loc, 5), pad(' ' + (s.tsc ?? '—'), 5), pad(s.quality ?? '—', 5)].join(' ') + (s.limited ? '  ⚠limited' : '') + (s.belowFloor ? '  ⚠below-floor' : ''));
 }
 
 // ── group + per-session-index means across sequences ─────────────────────────
@@ -162,6 +166,8 @@ const missing = [];
 for (const c of ['fat', 'pb', 'scratch']) if (seqCount(c) < 3) missing.push(`${c}: ${seqCount(c)}/3 sequences`);
 const unscored = sessions.some((s) => s.quality == null);
 if (unscored) missing.push('quality (checklist) not scored — required for "equal quality"');
+const belowFloor = sessions.filter((s) => s.belowFloor);
+if (belowFloor.length) missing.push(`${belowFloor.length} session(s) below quality floor — cost claim invalid there: ${belowFloor.map((s) => s.id).join(', ')}`);
 
 const rule = (r) => r <= 1 / 3 ? 'Goal B MET — ship compiler as init default; "fraction" claim earned'
   : r < 1 ? 'PARITY-PLUS — ship for freshness/selectivity; retire the "fraction" headline'

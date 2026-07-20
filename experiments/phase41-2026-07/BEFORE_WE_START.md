@@ -7,22 +7,22 @@ burns money for an INSUFFICIENT.
 
 Ordered by how much it hurts to skip.
 
-## 1. Quality scoring — BLOCKER (build before spending)
+## 1. Quality scoring — TOOLING BUILT; scoring still to be done per session
 
-The decision rule is "pb overhead ≤ ⅓ of fat **at equal quality**
-(checklist ≥ 11/12)." Today the harness records only `loc` and `tsc`; **nothing
-scores the checklist**. Without it a cheaper condition that ships worse code
-reads as a win, and the cost comparison is meaningless — `analyze.mjs` will (by
-design) return INSUFFICIENT for every run.
+The decision rule is "pb overhead ≤ ⅓ of fat **at equal quality**." Without a
+quality score a cheaper condition that ships worse code reads as a win — so
+`analyze.mjs` returns INSUFFICIENT until every session is scored.
 
-- **Do:** port the checklist from `../token-cost-2026-07/CHECKLIST.md` into a
-  scorer, or define a manual rubric applied **during** each session (not
-  reconstructed later). Record the score into each session's `meta.json` as
-  `checklist` (e.g. `"checklist": 11`) — the field `analyze.mjs` reads.
-- **Why during, not after:** scoring 36 transcripts weeks later is unreliable
-  and un-blinded; score at run time while the app is in front of you.
-- **R4 tie-in:** anchor checklist items to OWASP ASVS where applicable, so the
-  quality bar is external, not self-defined.
+- **Built:** `CHECKLISTS.md` — 4 per-session rubrics (auth 12 / billing 9 /
+  teams 9 / security 9), ASVS-anchored, reusing the token-cost + multi-module
+  rubrics; only billing is new. `score.mjs` records a hand score into
+  `meta.json` (`checklist_pass`/`checklist_total`) + an audit line in
+  `SCORES.md`. `analyze.mjs` reads them and enforces the floor.
+- **Floor:** `pass ≥ total − 1` per session (the multi-session generalization
+  of ≥ 11/12). A below-floor cell is disqualified from the cost comparison.
+- **Still to do (during the run, not after):** actually score each session's
+  `src/` — `node score.mjs <run-id> <pass>/<total> ["notes"]` — while the app
+  is in front of you. Scoring 36 transcripts weeks later is unreliable.
 
 ## 2. Environment stability — HIGH (Docker Postgres now available)
 
@@ -51,21 +51,23 @@ overhead is polluted *and* quality drops — a silently broken pb.
   moment). After it, assert `results/pb-<seq>-s2.brain.log` is **non-empty**.
 - Pairs with a `fat` 1 → 2 pilot for the first real pb/fat ratio via `analyze.mjs`.
 
-## 4. Verify `pb` installs like a real user — MEDIUM
+## 4. Verify `pb` installs like a real user — CONFIRMED ✓
 
-Now that the packages are published with co-located fragments, confirm the `pb`
-condition installs from **npm** (real fragments/versions) rather than the local
-monorepo workspace — otherwise the benchmarked brain may not match what ships.
-Check `run-sequence.sh`'s install step before the batch.
+Checked: `token-cost-2026-07/skeleton-b` has **no `.npmrc`** and no `file:` /
+`workspace:` links in `package.json` (`@fonderie/core: ^0.1.2` etc.), so a
+session's `npm install @fonderie/*` resolves from the **npm registry** — the
+real published packages with co-located fragments. The `pb` brain therefore
+reflects what ships. No action needed.
 
 ## Readiness gate
 
 Do **not** launch the full 36-session batch until:
 
-- [ ] #1 quality scorer/rubric in place, writing `checklist` to meta
+- [x] #1 quality tooling in place (CHECKLISTS.md + score.mjs; `analyze.mjs`
+      enforces the floor) — scoring still to be *done* per session during the run
 - [ ] #2 one stable Postgres up, all sessions pointed at it (Docker ready)
 - [ ] #3 pilot run `pb` 1→2 + `fat` 1→2, `brain.log` non-empty, `analyze.mjs` clean
-- [ ] #4 install path confirmed (npm vs workspace)
+- [x] #4 install path confirmed — installs from npm
 
 Then: `./stage41.sh` (resumable) → `node analyze.mjs` → decision per the locked
 pre-registration in `BRAIN_PLAN.md § Phase 4.1`. A gate that fails twice ends

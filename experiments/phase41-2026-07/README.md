@@ -75,6 +75,8 @@ INSUFFICIENT rather than guessing.
 - [x] Harness (run-sequence.sh, stage41.sh, sessions.jsonl)
 - [x] Per-session K archival (k_tokens in meta + CLAUDE.md copy) — attribution input
 - [x] Analysis harness (`analyze.mjs`) — dual-method, guardrailed, decision rule
+- [x] Quality tooling (`CHECKLISTS.md` 4 rubrics + `score.mjs`; floor enforced)
+- [x] Pre-flight checklist (`BEFORE_WE_START.md`); install-path confirmed (npm)
 - [ ] pb-condition validation session (1 paid session + free regen check)
 - [ ] 2-session pilot (1 pb + 1 fat, session 1) → `analyze.mjs` for early signal
 - [ ] Full batch (36 sessions, ~$30–60, several login cycles)
