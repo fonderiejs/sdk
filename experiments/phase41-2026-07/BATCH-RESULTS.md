@@ -69,3 +69,36 @@ per-session hand-scoring of all 36 against `CHECKLISTS.md` (every rubric item,
 not just the discriminators) is the last step to certify "equal quality" line by
 line; the automated signal is favorable (pb/fat clean on the items scratch
 misses). No claim shipped beyond what is measured.
+
+## Quality certification (delegation-aware, `score-trees.mjs`)
+
+Scoring the 9 final trees on 8 objectively-detectable security invariants.
+
+**Methodological finding (important):** a naive grep of the app `src/` PENALIZES
+delegation — bcrypt/logout/validation live INSIDE `@fonderie/auth`, not the app
+code, so a raw scan scored scratch *higher* than fat/pb (an artifact, not
+reality). `CHECKLISTS.md`'s rule is "delegation counts when wired," so the scorer
+credits an item when the app either hand-implements it OR registers the brick
+that provides it. Any future automated scoring MUST be delegation-aware.
+
+Delegation-aware mean security score /8:
+
+| cond | score | note |
+| --- | --- | --- |
+| fat | 8.00 | delegates all invariants to bricks |
+| pb | 7.67 | ≈ fat; pb-2 did not wire audit (7/8) |
+| scratch | 6.67 | insecure-secret fallback (2/3), missing logout (1/3), missing validation (1/3) |
+
+**Equal quality holds between the Fonderie conditions** (pb 7.67 ≈ fat 8.00);
+**scratch is materially less secure** (6.67, real flaws). Combined with: all 36
+`tsc` clean; scratch mean 768 LOC vs fat 270 / pb 216 (≈⅓ the code); the verified
+insecure-secret lines. Honest blemish: pb-2's missing audit wiring — one
+sequence, does not move the aggregate.
+
+## Bottom line
+
+The pre-registered "fraction of the token cost" goal is **met**: pb/fat knowledge
+overhead = **0.240 (≤⅓)** at N=3, both attribution methods agreeing once
+turn-count noise averaged out, at **equal Fonderie-condition quality** and with
+the **correctness-density** advantage over scratch replicated. Efficiency caveat
+(≈1.7× scratch turns, equal fat/pb) disclosed and orthogonal.
