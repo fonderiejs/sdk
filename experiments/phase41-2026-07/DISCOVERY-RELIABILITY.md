@@ -71,9 +71,21 @@ turning "found in post-hoc scoring" into "the harness refuses to green it."
 
 ## Verification note (Layer 1 only)
 
-A single re-run (`pb-verify`, sessions 1→3) tests Layer 1 on the exact scenario.
-**Preliminary:** the teams session did NOT stall — it installed
-`@fonderie/workspaces` and proceeded to build (contrast pb-2's decline). One
-sample of a probabilistic mitigation is encouraging, **not** coverage. Layers
-2–4 are still required to *ensure* the edge case is covered, because "usually
-proceeds" is not "always completes."
+A single re-run (`pb-verify`, sessions 1→3) tested Layer 1 on the exact scenario.
+
+**Result — the guidance flipped the behavior:**
+
+| | pb-2 (before) | pb-verify (after #30) |
+| --- | --- | --- |
+| teams session turns | 6 | 52 |
+| declined / asked permission | yes | no |
+| `@fonderie/workspaces` installed | no | **yes** |
+| `@fonderie/courier` (invite email) | no | **yes** |
+| teams/invite routes built | no | **yes** |
+
+On the exact scenario that failed, the model now installs the packages and
+builds the feature instead of stalling. Strong signal that Layer 1 helps — but
+it is **one sample of a probabilistic mitigation, not coverage.** Layers 2–4
+remain required to *ensure* the edge case is covered, because "usually proceeds"
+is not "always completes." The next model, prompt, or task may still stall;
+only deterministic detection (Layer 2) + a completion gate (Layer 4) close it.
