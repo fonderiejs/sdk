@@ -25,6 +25,10 @@ ROOT="$(cd "$EXPT/../.." && pwd)"
 TC="$ROOT/experiments/token-cost-2026-07"
 COND=$1; SEQ=$2
 MAXS=${SEQ_MAX_SESSIONS:-4}
+# Testability hooks (production defaults unchanged): CLAUDE_BIN lets a test
+# inject a fake model; SESSIONS_FILE lets it supply its own workload. Used by
+# test-l2-recover.sh to prove the Layer-2 detect/recover loop deterministically.
+CLAUDE_BIN=${CLAUDE_BIN:-claude}
 ISOROOT="${TMPDIR:-/tmp}/fonderie-p41"
 WORK="$ISOROOT/$COND-$SEQ"
 mkdir -p "$EXPT/results" "$ISOROOT"
@@ -133,7 +137,7 @@ JSON
   COMPLETED=false; RECOVERED=false
   for attempt in 1 2; do
     P="$PROMPT"; [ "$attempt" = 2 ] && P="$PROMPT$CORRECTIVE"
-    env -u CLAUDECODE -u CLAUDE_CODE_ENTRYPOINT DATABASE_URL="$DBURL" claude -p "$P" \
+    env -u CLAUDECODE -u CLAUDE_CODE_ENTRYPOINT DATABASE_URL="$DBURL" "$CLAUDE_BIN" -p "$P" \
       --model claude-opus-4-8 \
       --output-format json \
       --dangerously-skip-permissions \
@@ -174,5 +178,5 @@ JSON
     exit 3
   fi
   echo "$ID done (exit $CODE, $((END-START))s, loc:$loc tsc:$TSC, transcript:${TR:+yes})"
-done 3< "$EXPT/sessions.jsonl"
+done 3< "${SESSIONS_FILE:-$EXPT/sessions.jsonl}"
 echo "sequence $COND-$SEQ complete"

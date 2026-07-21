@@ -80,9 +80,13 @@ turning "found in post-hoc scoring" into "the harness refuses to green it."
       in meta; a session that never delivers its scope is flagged loudly and
       cannot pass silently.
 
-All four layers are in code and unit-verified against pb-2's exact failure. The
-end-to-end proof (a batch re-run where Layer 2 recovers a live stall) is the
-remaining empirical step — deferred to the next paid run, not claimed here.
+All four layers are in code. Layers 2+4 are proven END-TO-END by a forced-stall
+fixture (`test-l2-recover.sh`, \$0, no model): a fake model stalls, the real
+harness detects the missing capability, fires the corrective re-invoke, and
+recovers — while a never-completing model trips the loud gate. Layer 1 was
+verified in a live re-run (pb-verify). A full paid batch re-run remains as the
+only-in-production confirmation, but the coverage mechanism itself is now tested,
+not asserted.
 
 ## Verification note (Layer 1 only)
 
