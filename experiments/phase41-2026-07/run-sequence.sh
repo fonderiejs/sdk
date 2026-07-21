@@ -105,16 +105,45 @@ JSON
     MCPARGS=(--mcp-config "$WORK/.mcp.json")
   fi
 
+  # Layer 2/4 (DISCOVERY-RELIABILITY.md): deterministic completion detect-and-
+  # recover. The stall signature is deterministic — the task's `scope` capability
+  # did not land (its @fonderie package not installed AND no hand-rolled code for
+  # it). We do not trust the model's prose; we inspect the tree. If incomplete
+  # after the first attempt, re-invoke ONCE with a corrective directive (gate
+  # discipline: one iteration). `completed` is recorded as a hard gate flag so a
+  # stalled session can never pass silently.
+  # capability keyword per scope package (delegation OR hand-rolled both count)
+  kw_for() { case "$1" in
+    workspaces) echo 'workspace';; courier) echo 'mail|email|invit';;
+    rate-limit) echo 'rate.?limit|ratelimit';; audit) echo 'audit';;
+    billing) echo 'subscription|stripe|checkout';; auth) echo 'login|auth|session';;
+    permissions) echo 'role|permission';; *) echo "$1";; esac; }
+  is_complete() {  # every scope pkg present as install OR as code
+    [ -z "$SCOPE" ] && return 0
+    local IFS=,; for p in $SCOPE; do
+      [ -d "$WORK/node_modules/@fonderie/$p" ] && continue
+      cat "$WORK"/src/*.ts 2>/dev/null | grep -qiE "$(kw_for "$p")" && continue
+      return 1
+    done; return 0
+  }
+  CORRECTIVE=$'\n\n[HARNESS] Complete the task fully and autonomously in this run. If it needs an @fonderie package you have not installed, install it (npm i), run its migrations, wire it per the brain recipe, and build the endpoints. Do NOT ask questions, request permission, or report it as not-doable — adding the brick IS the task. Pick sensible defaults for any provider/config choice behind fail-fast env vars.'
+
   cd "$WORK"
   START=$(date +%s)
-  env -u CLAUDECODE -u CLAUDE_CODE_ENTRYPOINT DATABASE_URL="$DBURL" claude -p "$PROMPT" \
-    --model claude-opus-4-8 \
-    --output-format json \
-    --dangerously-skip-permissions \
-    ${MCPARGS[@]+"${MCPARGS[@]}"} \
-    </dev/null \
-    > "$EXPT/results/$ID.json" 2> "$EXPT/results/$ID.err"
-  CODE=$?
+  COMPLETED=false; RECOVERED=false
+  for attempt in 1 2; do
+    P="$PROMPT"; [ "$attempt" = 2 ] && P="$PROMPT$CORRECTIVE"
+    env -u CLAUDECODE -u CLAUDE_CODE_ENTRYPOINT DATABASE_URL="$DBURL" claude -p "$P" \
+      --model claude-opus-4-8 \
+      --output-format json \
+      --dangerously-skip-permissions \
+      ${MCPARGS[@]+"${MCPARGS[@]}"} \
+      </dev/null \
+      > "$EXPT/results/$ID.json" 2> "$EXPT/results/$ID.err"
+    CODE=$?
+    if is_complete; then COMPLETED=true; break; fi
+    [ "$attempt" = 1 ] && { RECOVERED=true; echo "  ⚠ $ID incomplete (scope '$SCOPE' not delivered) — Layer-2 corrective re-invoke"; }
+  done
   END=$(date +%s)
 
   loc=$(find "$WORK/src" -name '*.ts' 2>/dev/null | xargs cat 2>/dev/null | grep -vc '^[[:space:]]*$')
@@ -129,8 +158,9 @@ JSON
     *)    KCH=0 ;;
   esac
   KTOK=$(( ${KCH:-0} / 4 ))
-  echo "{\"run\":\"$ID\",\"cond\":\"$COND\",\"seq\":\"$SEQ\",\"session\":$N,\"exit\":$CODE,\"wall_s\":$((END-START)),\"loc\":$loc,\"tsc\":\"$TSC\",\"k_tokens\":$KTOK}" \
+  echo "{\"run\":\"$ID\",\"cond\":\"$COND\",\"seq\":\"$SEQ\",\"session\":$N,\"exit\":$CODE,\"wall_s\":$((END-START)),\"loc\":$loc,\"tsc\":\"$TSC\",\"k_tokens\":$KTOK,\"scope\":\"$SCOPE\",\"completed\":$COMPLETED,\"recovered\":$RECOVERED}" \
     > "$EXPT/results/$ID.meta.json"
+  [ "$COMPLETED" = false ] && echo "  ✗ GATE: $ID did not deliver scope '$SCOPE' even after corrective re-invoke (Layer-4 flag)"
 
   SID=$(node -e 'try{console.log(JSON.parse(require("fs").readFileSync(process.argv[1])).session_id||"")}catch{}' "$EXPT/results/$ID.json")
   TR=""

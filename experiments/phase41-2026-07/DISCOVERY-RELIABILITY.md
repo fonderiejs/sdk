@@ -63,11 +63,26 @@ turning "found in post-hoc scoring" into "the harness refuses to green it."
 
 ## Status
 
-- [x] Layer 1 — guidance (#30)
-- [ ] Layer 2 — deterministic completion detect-and-recover (the real coverage)
-- [ ] Layer 3a — discovery uses the installed fragment (kills spurious skew)
-- [ ] Layer 3b — default provider recipe (removes a decision point)
-- [ ] Layer 4 — per-session completion gate in the harness
+- [x] Layer 1 — directive guidance (#30)
+- [x] Layer 2 — deterministic completion detect-and-recover. `run-sequence.sh`
+      inspects the tree after each session: every `scope` capability must be
+      present (its @fonderie package installed OR hand-rolled code for it). If
+      not, ONE corrective re-invoke with an explicit "install + build, don't
+      ask" directive. Doesn't trust the model's prose — inspects the artifact.
+      Verified: pb-2's exact stall (workspaces absent, no workspace code) is
+      detected and would trigger recovery.
+- [x] Layer 3a — skew note SCOPED to the queried package + recipe deps (was
+      project-wide; a stale unrelated `core` no longer spooks a `workspaces`
+      query). Discovering a not-installed package yields no banner.
+- [x] Layer 3b — `email-provider-default` invariant on the courier recipes:
+      default to SMTP-from-env, don't stop to ask which provider.
+- [x] Layer 4 — per-session completion gate. `completed`/`recovered` recorded
+      in meta; a session that never delivers its scope is flagged loudly and
+      cannot pass silently.
+
+All four layers are in code and unit-verified against pb-2's exact failure. The
+end-to-end proof (a batch re-run where Layer 2 recovers a live stall) is the
+remaining empirical step — deferred to the next paid run, not claimed here.
 
 ## Verification note (Layer 1 only)
 
