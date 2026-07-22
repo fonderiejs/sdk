@@ -52,11 +52,16 @@ function mcpSchemaTokens() {
 const MCP_TAX = mcpSchemaTokens();
 const usesMcp = (cond) => cond === 'pb' || cond === 'pb-scoped';
 
-// Pull the Fonderie knowledge the model FETCHED at runtime: sum the sizes of
-// every brain_query tool_result. Match tool_use(id) → tool_result(tool_use_id).
+// Pull the Fonderie knowledge the model FETCHED at runtime, on ANY transport, so
+// every condition is scored identically (PLAN-SKILLS-CLI.md):
+//   MCP  — tool_use named brain_query.
+//   CLI  — Bash tool_use whose command runs brain-query.mjs.
+//   LAZY — Read tool_use whose file_path is a lazy body (skills/fonderie/<pkg>.md
+//          or the router SKILL.md pulled on demand).
+// In each case the paired tool_result carries the knowledge; sum its size.
 function fetchedKnowledge(transcriptPath) {
   if (!existsSync(transcriptPath)) return { calls: 0, tokens: 0 };
-  const brainIds = new Set();
+  const ids = new Set();
   let calls = 0, tokens = 0;
   for (const line of readFileSync(transcriptPath, 'utf8').split('\n')) {
     if (!line.trim()) continue;
@@ -64,8 +69,15 @@ function fetchedKnowledge(transcriptPath) {
     const content = o.message?.content;
     if (!Array.isArray(content)) continue;
     for (const b of content) {
-      if (b.type === 'tool_use' && /brain_query/.test(b.name || '')) { brainIds.add(b.id); calls++; }
-      if (b.type === 'tool_result' && brainIds.has(b.tool_use_id)) {
+      if (b.type === 'tool_use') {
+        const mcp = /brain_query/.test(b.name || '');
+        const cmd = String(b.input?.command || b.input?.cmd || '');
+        const cli = /brain-query\.mjs/.test(cmd);
+        const path = String(b.input?.file_path || b.input?.path || '');
+        const lazy = /skills\/fonderie\/[\w-]+\.md|skills\/SKILL\.md/.test(path);
+        if (mcp || cli || lazy) { ids.add(b.id); calls++; }
+      }
+      if (b.type === 'tool_result' && ids.has(b.tool_use_id)) {
         const t = typeof b.content === 'string' ? b.content
           : Array.isArray(b.content) ? b.content.map((x) => x.text || '').join('') : JSON.stringify(b.content || '');
         tokens += tok(t);
@@ -108,7 +120,7 @@ for (const f of readdirSync(resultsDir)) {
   // per-turn Fonderie-knowledge footprint (turn-neutral):
   //   resident CLAUDE.md (K) + resident MCP schema (mcp) + fetched brain_query / turns
   const perTurn = K == null ? null : K + mcp + fetched.tokens / turns;
-  rows.push({ id, cond: meta.cond, session: meta.session, turns, K, mcp, fetchedTok: fetched.tokens, fetchedCalls: fetched.calls, perTurn, quality: meta.checklist_pass != null ? `${meta.checklist_pass}/${meta.checklist_total}` : '—' });
+  rows.push({ id, cond: meta.cond, session: meta.session, turns, K, mcp, fetchedTok: fetched.tokens, fetchedCalls: fetched.calls, perTurn, wallS: meta.wall_s ?? null, quality: meta.checklist_pass != null ? `${meta.checklist_pass}/${meta.checklist_total}` : '—' });
 }
 rows.sort((a, b) => a.cond.localeCompare(b.cond) || a.session - b.session);
 
@@ -147,6 +159,15 @@ console.log('\n=== Turn count (efficiency — a separate axis, NOT knowledge ove
 for (const c of conds) {
   const t = rows.filter((r) => r.cond === c).map((r) => r.turns);
   if (t.length) console.log(`  ${pad(c, 10)} turns: ${t.join(', ')}  (mean ${Math.round(mean(t))})`);
+}
+
+// wall-clock — the SECOND axis (PLAN-SKILLS-CLI.md): CLI/lazy trade latency for
+// tokens (Playwright: MCP 90s vs CLI 3-10min). Report it so a token win that
+// blows up wall-clock is visible, not hidden.
+console.log('\n=== Wall-clock (the second axis — tokens saved can cost latency) ===');
+for (const c of conds) {
+  const w = rows.filter((r) => r.cond === c && r.wallS != null).map((r) => r.wallS);
+  if (w.length) console.log(`  ${pad(c, 10)} mean ${Math.round(mean(w))}s/session  (total ${Math.round(w.reduce((a, b) => a + b, 0))}s over ${w.length})`);
 }
 
 console.log('\nNote: n=1 sequence — directional. The per-turn footprint removes the');
