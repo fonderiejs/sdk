@@ -172,3 +172,39 @@ fraction on both. BATCH-RESULTS should carry this caveat.
 
 **Decision:** pilot CLEARS the gate → the full N=3 pb-lazy run is the verdict.
 n=1 is directional; the signal is strong and consistent across both metrics.
+
+## VERDICT — N=3 (2026-07-22): lazy-skills WINS. Ship as default.
+
+Full pb-lazy × 3 sequences × 4 sessions. **12/12 completed, zero stalls, zero
+gate failures**; all 3 teams sessions installed workspaces+courier and built
+invites. The pilot held at scale:
+
+| condition | knowledge overhead vs fat (fair) | amortized floor | wall-clock |
+| --- | --- | --- | --- |
+| fat (eager skill)    | 1.000 | 1.000 | 207s |
+| pb (eager + MCP)     | 0.395 (parity-plus) | 0.277 | 219s |
+| pb-cli               | 0.317 | 0.292 | — |
+| **pb-lazy (router)** | **0.136 (FRACTION)** | 0.053 | 283s |
+
+**pb-lazy/fat = 0.136** — held from the pilot's 0.117, ~2.9× under pb, the
+cheapest condition measured, on the fair resident-after-read metric.
+
+**Pre-registered gate — all four met:** resident 0.136 < 0.28×fat ✓; completion
+12/12 = pb ✓; quality tsc-clean ✓; wall-clock 283s = 1.29× pb, < 1.5× ✓.
+**→ Ship lazy-skills (router + on-demand bodies) as the default.**
+
+**Two-axis honesty:** the token win costs latency — pb-lazy is the slowest
+(283s vs 207–219s), because lazy reads are round trips. Within bounds, real. For
+coding agents building a SaaS this is the right trade; MCP stays the option for
+latency-sensitive / long-running loops (Playwright's rule).
+
+## Next (packaging)
+
+1. Wire `generate-skill.mjs` into `fonderie init` / postinstall as the default
+   (replacing the eager project brain); keep `brain-serve` MCP as the stateful
+   option.
+2. Package the `fonderie brain query` CLI as a bin; ship the skill in the
+   cross-vendor format (Phase 3 install matrix).
+3. Reconcile BATCH-RESULTS: publish the fair resident-after-read numbers
+   alongside the amortized (pb is parity-plus, not fraction, under the fair
+   metric; pb-lazy is a fraction on both).
