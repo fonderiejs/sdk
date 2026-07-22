@@ -142,3 +142,33 @@ stresses its amortization assumption.
 pb-lazy is scored on the same basis as pb's eager resident — THEN verdict. Same
 discipline as the Method-A/B divergence: fix the measurement before trusting the
 number.
+
+## Corrected verdict — resident-after-read metric (2026-07-22)
+
+Built the fair metric (`instrument.mjs`): a fetched body/result stays
+cache-resident every turn from its read onward (like the eager brain), and a
+fetch is only counted if it's NOT already in the resident K (fixed a fat
+double-count — its skill dir is already K). Fair picture:
+
+| condition | resident-after-read (fair) | amortized (floor) |
+| --- | --- | --- |
+| fat (eager skill)   | 1.000 (27,999 tok/turn) | 1.000 |
+| pb (eager + MCP)    | **0.395** (parity-plus) | 0.277 |
+| pb-cli (eager + CLI)| 0.317 (fraction)        | 0.292 |
+| **pb-lazy (router)**| **0.117 (FRACTION)**    | 0.053 |
+
+**pb-lazy wins decisively — on BOTH metrics.** 0.117 fair, 0.053 floor: ~3.4×
+under pb, and the advantage SURVIVES the strict metric (it wasn't an
+amortization artifact). Why it holds: pb-lazy loads only the 1–2 bodies the task
+touches; pb keeps ALL installed packages resident plus its fetches. At equal
+completion (3/3, no stall), equal quality (tsc clean), and equal wall-clock
+(211s ≈ pb 219s), pb-lazy **clears the pre-registered gate** (< 0.28 × fat).
+
+**Honest side-finding (flagged for follow-up):** the resident-after-read metric
+also moves *pb* from 0.28 (amortized, as published) to **0.40 (parity-plus)** —
+because its brain_query fetches stay resident too, which the amortized proxy
+divided away. The fraction claim for pb is metric-dependent; pb-lazy is a
+fraction on both. BATCH-RESULTS should carry this caveat.
+
+**Decision:** pilot CLEARS the gate → the full N=3 pb-lazy run is the verdict.
+n=1 is directional; the signal is strong and consistent across both metrics.
