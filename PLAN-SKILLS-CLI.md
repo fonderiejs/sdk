@@ -110,3 +110,35 @@ LLM's non-deterministic output consistent — is the product and is untouched.
 This plan only changes *how the brain's knowledge reaches the agent*: lazily,
 through skills + a CLI, instead of eagerly resident. Same knowledge, loaded when
 needed.
+
+## Pilot result — 2026-07-22 (pb-lazy 1→3): promising, but the metric needs work
+
+**Measured & real:** resident router **~1,410 tok — 5× under pb's eager 6–13K**.
+Completion 3/3, no stall, tsc clean (the router routed correctly — the model
+`cat`'d the right bodies, installed workspaces+courier, built teams). Wall-clock
+**211s/sess ≈ pb's 219s** — the CLI/lazy latency fear did NOT materialize.
+
+**Bug found + fixed while auditing:** the model fetched bodies via
+`cat skills/fonderie/<pkg>.md` (a shell read), which `instrument.mjs` did not
+count — fetched (and the ratio) was understated. Matcher now counts cat/head/tail
+of skill files; s3 fetched went 0 → 5,167.
+
+**The honest catch — do NOT ship 0.054.** Our per-turn metric amortizes fetched
+as `total/turns`, treating a body read as a one-turn cost. But a `cat`'d body
+stays in context (cache-read) every subsequent turn. So the true cost is between
+amortized (best case, pb-lazy/fat = 0.054) and resident-after-read (worst case,
+body read at turn 1 → s2 ≈ 7,429 tok/turn ≈ pb's 0.28), set by *when* the body is
+read — n=1 cannot settle it.
+
+**What is genuinely true:** pb-lazy loads only the **1–2 packages the task
+touches** (router + those bodies) vs pb's **all installed, eager**. A real
+reduction, narrower than 5×. The metric that settles it is the **actual
+cache_read attributable to Fonderie content per turn**, not the
+resident+fetched/turns proxy — fine for eager conditions, but the lazy pattern
+stresses its amortization assumption.
+
+**Next (before any N=3 spend):** add a resident-after-read model to
+`instrument.mjs` (a body counts toward every turn from its read onward), so
+pb-lazy is scored on the same basis as pb's eager resident — THEN verdict. Same
+discipline as the Method-A/B divergence: fix the measurement before trusting the
+number.

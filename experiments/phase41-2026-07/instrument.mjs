@@ -72,7 +72,12 @@ function fetchedKnowledge(transcriptPath) {
       if (b.type === 'tool_use') {
         const mcp = /brain_query/.test(b.name || '');
         const cmd = String(b.input?.command || b.input?.cmd || '');
-        const cli = /brain-query\.mjs/.test(cmd);
+        // CLI discovery (brain-query.mjs) OR a shell read of a skill file
+        // (cat/head/tail/less/grep of SKILL.md or fonderie/<pkg>.md) — the lazy
+        // arm often `cat`s the body rather than using the Read tool, and that
+        // content still enters context, so it MUST be counted (found via audit).
+        const cli = /brain-query\.mjs/.test(cmd)
+          || (/\b(cat|head|tail|less|bat)\b/.test(cmd) && /skills\/(fonderie\/[\w-]+\.md|SKILL\.md)/.test(cmd));
         const path = String(b.input?.file_path || b.input?.path || '');
         const lazy = /skills\/fonderie\/[\w-]+\.md|skills\/SKILL\.md/.test(path);
         if (mcp || cli || lazy) { ids.add(b.id); calls++; }
