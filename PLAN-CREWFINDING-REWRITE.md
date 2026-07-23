@@ -54,9 +54,21 @@ Fonderie-rebuilt backend** — same paths, status codes, response shapes, cookie
 No frontend edits, no collection edits. Measured, not asserted. Directions excluded.
 
 ## Phases
-0. **Capture the contract as a test** — extract every request/expected-response
-   from the collection; get a baseline green against the *current* backend; init
-   the `platform/*` submodules to see the real implementation + frontend.
+0. **Capture the contract as a test** — ✅ **done** (`experiments/crewfinding-rewrite/`).
+   Two findings changed the shape of the work:
+   - **The shipped Postman collection has zero assertions** — a request set, not a
+     test. So "newman green" was meaningless as written. Built an executable
+     **contract oracle** (`build-contract-tests.mjs` → `contract-tests.postman_collection.json`):
+     11 in-scope endpoints with real assertions (status, flat response shapes,
+     `IUserDTO`/`IWorkspaceDTO` fields, HttpOnly cookies, error shape) derived from
+     `POSTMAN_SDK_PARITY.md`. Validated: it loads in newman and its assertions fire.
+   - **`platform/*` are stale `.gitmodules` entries, not tracked gitlinks** — the
+     real backend + frontend are NOT in this environment. So a baseline-green
+     against the *current* backend can't be captured here, and the live frontend
+     can't be run. The oracle is portable: run it where the platform code lives for
+     the true baseline, or against the Fonderie backend for the contract-fit verdict.
+   - Path mismatch **confirmed** from the collection itself: `/auth/forgot-password`,
+     `/auth/reset-password`, `/auth/verify-email` vs Fonderie's `/auth/email/*`.
 1. **Stand up the Fonderie backend** — `fonderie add` auth + workspaces, wire,
    boot (db-free authoring — no DB setup to build).
 2. **Reconcile the contract** — pursue A, fall back to B, document exactly where
