@@ -185,6 +185,50 @@ test('FSTemplateResolver: passes locale to file lookup (no error on missing)', a
 	assert.ok(result.text.includes('some-type'));
 });
 
+// ── Layout composition ───────────────────────────────────────────
+
+test('wrapLayout: injects a body fragment into the shell', async () => {
+	const { wrapLayout } = await import('../templates/layout');
+	const html = wrapLayout('<h1>Hello</h1>');
+	assert.ok(html.includes('<!DOCTYPE html>'), 'wraps in a full document');
+	assert.ok(html.includes('<h1>Hello</h1>'), 'contains the body');
+	assert.ok(html.includes('Fonderie'), 'carries the branded shell');
+	assert.ok(!html.includes('{{content}}'), 'slot is consumed');
+});
+
+test('wrapLayout: passes a full document through untouched (no double-wrap)', async () => {
+	const { wrapLayout } = await import('../templates/layout');
+	const full = '<!DOCTYPE html><html><body>done</body></html>';
+	assert.equal(wrapLayout(full), full);
+});
+
+test('DBTemplateResolver: composes a body fragment into the layout + interpolates', async () => {
+	const { DBTemplateResolver } = await import('../templates/resolver');
+	const store: IStoreAdapter = {
+		query: async <T = unknown>(_sql: string, params?: unknown[]): Promise<T[]> => {
+			// The layout lookup (type = '_layout') returns nothing → default shell.
+			if (params?.[0] === 'email-verification') {
+				return [
+					{
+						subject: 'Hi {{firstName}}',
+						html: '<h1>Verify</h1><p><span class="pin-code">{{pin}}</span></p>',
+						text: 'code {{pin}}',
+					},
+				] as T[];
+			}
+			return [] as T[];
+		},
+		transaction: async (fn) => fn(store),
+	};
+	const resolver = new DBTemplateResolver(store);
+	const r = await resolver.resolve('email-verification', { firstName: 'Ada', pin: '123456' });
+	assert.equal(r.subject, 'Hi Ada');
+	assert.ok(r.html?.includes('<!DOCTYPE html>'), 'wrapped in the shell');
+	assert.ok(r.html?.includes('123456'), 'pin interpolated into the html');
+	assert.ok(!r.html?.includes('{{pin}}'), 'no unresolved variables remain');
+	assert.equal(r.text, 'code 123456');
+});
+
 // ── ICourierMessage type ─────────────────────────────────────────
 
 test('ICourierMessage: shape is correct', () => {
