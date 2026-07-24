@@ -72,3 +72,54 @@ SQL. Fix: republish both as **2.0.1** (changeset `republish-events-customers`).
   (no hand-copy needed). rate-limit needs the same `1.0.1` republish.
 - Ran fully in-docker (host↔container networking is broken in this environment),
   so it's a faithful *contract* run, still a proxy for the live frontend.
+
+---
+
+## Re-run #2 — against the published 3.0.0 SDK (2026-07-24)
+
+Re-ran the oracle against the **freshly published whole-SDK 3.0.0 release**
+(the email-templates + localization + theme work; `core@0.3.0`, `store@0.1.2`,
+everything else `3.0.0`, `rate-limit@2.0.0`).
+
+**Result: 25/25 assertions pass, 0 failed** (11 requests; workspace GET/PUT
+green-skipped without `workspace_id`, same as before).
+
+**The release defect from re-run #1 is gone.** `npm install @fonderie/*@latest`
+resolved **cleanly in-container — no `ERESOLVE`, no `--legacy-peer-deps`**:
+
+- `@fonderie/core 0.3.0`, `auth 3.0.0`, `events 3.0.0`, `workspaces 3.0.0`,
+  `store 0.1.2`, `adapter-express 3.0.0` — all installed and booted.
+- Backend applied every migration (events, auth ×13, workspaces ×3) and reached
+  `LISTENING` first try; the `events` migration SQL ships (the missing-SQL bug
+  from re-run #1 is fixed).
+
+Peer ranges are internally consistent across the 3.0.0 cascade — every new
+`^3.0.0` / `^0.3.0` reference matches the version its target bumped to. Ran fully
+in-docker on a private network (`cf-net`/`cf-pg`/`cf-app`) since host↔container
+networking is broken in this environment — a faithful contract run.
+
+**Verdict unchanged and now clean: Outcome A holds on the published SDK.** An
+existing frontend works unchanged against a Fonderie-rebuilt backend via one
+`onResponse` config option + a ~15-line path shim, installed from npm with a
+plain `npm install`.
+
+### Broken builds deprecated on npm (2026-07-24)
+
+The three stale artifacts from the partial release (the defect above) are now
+**`npm deprecate`d** so anyone who explicitly pins them gets steered to the fix,
+while `latest` stays warning-free:
+
+| Deprecated | Reason | Message points to |
+| --- | --- | --- |
+| `@fonderie/events@2.0.0` | `core@^1.0.0`/`store@^1.0.0` peers → ERESOLVE, **and** missing migration SQL | `2.0.1` |
+| `@fonderie/customers@2.0.0` | `core@^1.0.0`/`store@^1.0.0` peers → ERESOLVE | `2.0.1` |
+| `@fonderie/rate-limit@1.0.0` | `core@^1.0.0`/`store@^1.0.0` peers → ERESOLVE | `1.0.1` |
+
+Scope verified: only these three versions carry the flag; the replacements
+(`2.0.1`/`2.0.1`/`1.0.1`) and the current release (`events`/`customers` `3.0.0`,
+`rate-limit` `2.0.0`) are clean, and every `latest` dist-tag is untouched.
+Confirmed on install — `npm install @fonderie/events@2.0.0` prints the
+`npm warn deprecated …` notice; `@2.0.1` and `@latest` install silently. This is
+the version-level cleanup only; the scope-wide `@fonderie`→`@fonderiejs`
+deprecation (MIGRATION-FONDERIEJS.md checklist item 8) stays deferred until the
+1.0.0 migration.
