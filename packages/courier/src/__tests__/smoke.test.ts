@@ -229,6 +229,32 @@ test('DBTemplateResolver: composes a body fragment into the layout + interpolate
 	assert.equal(r.text, 'code 123456');
 });
 
+test('DBTemplateResolver: serves exact locale, never a sibling region', async () => {
+	const { DBTemplateResolver } = await import('../templates/resolver');
+	// Rows: en-CA, en-US, and a NULL default — all for 'password-reset'.
+	const rows: Record<string, { subject: string; html: null; text: string }> = {
+		'en-CA': { subject: 'CA', html: null, text: 'reset (CA)' },
+		'en-US': { subject: 'US', html: null, text: 'reset (US)' },
+		DEFAULT: { subject: 'DEF', html: null, text: 'reset (default)' },
+	};
+	const store: IStoreAdapter = {
+		// Emulate: WHERE (locale = $2 OR locale IS NULL) ORDER BY exact DESC LIMIT 1
+		query: async <T = unknown>(_sql: string, params?: unknown[]): Promise<T[]> => {
+			const [type, locale] = (params ?? []) as [string, string | null];
+			if (type !== 'password-reset') return [] as T[];
+			const exact = locale ? rows[locale] : undefined;
+			return [exact ?? rows.DEFAULT] as T[];
+		},
+		transaction: async (fn) => fn(store),
+	};
+	const resolver = new DBTemplateResolver(store);
+
+	assert.equal((await resolver.resolve('password-reset', {}, 'en-CA')).text, 'reset (CA)');
+	assert.equal((await resolver.resolve('password-reset', {}, 'en-US')).text, 'reset (US)');
+	// A region we didn't seed must fall to the neutral default — not a sibling.
+	assert.equal((await resolver.resolve('password-reset', {}, 'de-DE')).text, 'reset (default)');
+});
+
 // ── ICourierMessage type ─────────────────────────────────────────
 
 test('ICourierMessage: shape is correct', () => {

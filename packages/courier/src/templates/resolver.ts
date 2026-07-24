@@ -41,10 +41,13 @@ export class DBTemplateResolver implements ITemplateResolver {
 			html: string | null;
 			text: string;
 		}>(
+			// Serve the exact locale, else the neutral NULL default — never a
+			// sibling region (en-CA must not fall back to en-US); the WHERE
+			// excludes other locales so legal/jurisdictional copy can't bleed.
 			`SELECT subject, html, text
 			 FROM fonderie_courier_templates
-			 WHERE type = $1 AND active = true
-			 ORDER BY (locale = $2)::int DESC, (locale IS NULL)::int DESC
+			 WHERE type = $1 AND active = true AND (locale = $2 OR locale IS NULL)
+			 ORDER BY (locale IS NOT DISTINCT FROM $2) DESC
 			 LIMIT 1`,
 			[type, locale ?? null],
 		);
@@ -68,8 +71,8 @@ export class DBTemplateResolver implements ITemplateResolver {
 		const [row] = await this.store.query<{ html: string | null }>(
 			`SELECT html
 			 FROM fonderie_courier_templates
-			 WHERE type = $1 AND active = true
-			 ORDER BY (locale = $2)::int DESC, (locale IS NULL)::int DESC
+			 WHERE type = $1 AND active = true AND (locale = $2 OR locale IS NULL)
+			 ORDER BY (locale IS NOT DISTINCT FROM $2) DESC
 			 LIMIT 1`,
 			[LAYOUT_TYPE, locale ?? null],
 		);

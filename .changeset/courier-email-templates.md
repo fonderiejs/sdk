@@ -1,5 +1,7 @@
 ---
 "@fonderie/courier": minor
+"@fonderie/auth": minor
+"@fonderie/core": minor
 ---
 
 Production-grade, composable email templates. Templates are now **body
@@ -15,3 +17,14 @@ Seeds now ship the templates auth and workspaces actually send —
 JSON debug fallback). Founders can override the whole shell by storing a
 `_layout` template (DB row or `_layout.html` file); a template that is already a
 full HTML document is passed through untouched (never double-wrapped).
+
+Localization is now wired end-to-end. `IAuthUser` carries the user's `locale`
+(sourced from the DB row via the session middleware), and every auth/workspaces
+notification emit now stamps `locale` on the courier message so per-locale
+templates are actually selected. The resolver's locale lookup was made
+region-safe: it serves the **exact** locale or the neutral `NULL` default and
+**never a sibling region** (`en-CA` will not fall back to `en-US`) — the SQL now
+uses `locale IS NOT DISTINCT FROM $2` ordering plus a `(locale = $2 OR locale IS
+NULL)` filter, so legal/jurisdictional copy can't bleed across regions.
+Workspace invitations intentionally omit `locale` (the invitee's language is
+unknown at invite time) and fall to the neutral default.
